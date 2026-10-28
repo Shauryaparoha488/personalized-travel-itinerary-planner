@@ -48,6 +48,7 @@ class DayPlan(BaseModel):
     day: int = Field(ge=1)
     title: str
     description: str
+    attraction: Activity
     morning: Activity
     afternoon: Activity
     evening: Activity
@@ -121,6 +122,20 @@ def _make_itinerary(request: ItineraryRequest, payload: dict[str, Any], source: 
     return result
 
 
+def update_day(plan: Itinerary, day_number: int, changes: dict[str, Any]) -> Itinerary:
+    """Return a copy of an itinerary with one validated day edited."""
+    if not 1 <= day_number <= len(plan.days):
+        raise ValueError("Choose a day that exists in this itinerary.")
+    allowed = {"title", "description", "attraction", "morning", "afternoon", "evening", "local_food", "tip"}
+    if not changes or set(changes) - allowed:
+        raise ValueError("The edit contains unsupported itinerary fields.")
+    existing = plan.days[day_number - 1]
+    updated_day = DayPlan.model_validate({**existing.model_dump(), **changes})
+    days = list(plan.days)
+    days[day_number - 1] = updated_day
+    return plan.model_copy(update={"days": days})
+
+
 def generate_demo_itinerary(request: ItineraryRequest) -> Itinerary:
     """Build a deterministic demo plan without network access or credentials."""
     descriptions = [
@@ -132,6 +147,7 @@ def generate_demo_itinerary(request: ItineraryRequest) -> Itinerary:
     for i in range(request.days):
         title, desc, food, tip = descriptions[i % len(descriptions)]
         days.append({"day": i + 1, "title": title, "description": f"A flexible sample day in {request.destination}.",
+                     "attraction": {"title": "A local landmark or museum", "description": "Choose a well-reviewed local landmark or museum that matches your interests; check current details before visiting."},
                      "morning": {"title": f"Explore {request.destination}", "description": desc},
                      "afternoon": {"title": "Choose a local highlight", "description": "Pick an attraction or activity that matches your interests; confirm details before visiting."},
                      "evening": {"title": "Unwind nearby", "description": "Keep the evening flexible for a meal and a gentle neighborhood walk."}, "local_food": food, "tip": tip})
@@ -156,8 +172,11 @@ def generate_gemini_itinerary(request: ItineraryRequest, api_key: str | None = N
         "start_date": request.start_date.isoformat() if request.start_date else None,
     }
     prompt = ("Create a practical, varied travel itinerary from the request below. Return only data matching the schema. "
+              "For every day, suggest a named attraction or place with a short description, three time-of-day activities, "
+              "and a local dining or dish idea that respects the dietary preference. "
               "Use INR integer estimates that add up sensibly; do not claim live prices, opening hours, availability, distances, "
-              "or verified facts. Label costs as estimates and make assumptions clear. Avoid unsafe or discriminatory advice.\n"
+              "or verified facts. Attraction names, activities, and dining ideas are suggestions to independently verify. "
+              "Label costs as estimates and make assumptions clear. Avoid unsafe or discriminatory advice.\n"
               + json.dumps(prompt_data, ensure_ascii=False))
     try:
         client = genai.Client(api_key=api_key)
@@ -187,7 +206,8 @@ def markdown_itinerary(request: ItineraryRequest, plan: Itinerary) -> str:
     over_budget = max(0, plan.budget.total - request.budget_inr)
     lines += [f"- **Estimated total:** ₹{plan.budget.total:,.0f}", f"- **Remaining:** ₹{max(0, request.budget_inr - plan.budget.total):,.0f}", f"- **Over budget:** ₹{over_budget:,.0f}", f"- Assumptions: {plan.budget.assumptions}", ""]
     for day in plan.days:
-        lines += [f"## Day {day.day}: {day.title}", "", day.description, ""]
+        lines += [f"## Day {day.day}: {day.title}", "", day.description,
+                  f"- **Attraction idea — {day.attraction.title}:** {day.attraction.description}", ""]
         for label in ("morning", "afternoon", "evening"):
             activity = getattr(day, label)
             lines.append(f"- **{label.title()} — {activity.title}:** {activity.description}")

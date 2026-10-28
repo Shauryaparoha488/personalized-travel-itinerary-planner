@@ -12,24 +12,25 @@ Travelers often need to balance interests, duration, group size, and a fixed bud
 
 - Build an accessible Python web application using Streamlit.
 - Support a working demo without API credentials and optional Gemini generation.
-- Present daily activities, food ideas, tips, and a categorized INR estimate.
-- Validate inputs, handle common failures, and allow Markdown export.
+- Present daily attraction ideas, activities, dining ideas, tips, and a categorized INR estimate.
+- Validate inputs, handle common failures, support itinerary edits, and allow Markdown export.
+- Persist plans through Supabase when the server credentials are configured.
 
 ## Methodology and architecture
 
-Users enter trip details in `app.py`. `src/itinerary.py` validates the request, produces a deterministic demo plan or calls the Google GenAI SDK for structured JSON, validates the result with Pydantic, calculates the remaining budget, and formats an export. Unit tests cover validation and core demo flows.
+Users enter trip details in `app.py`. `src/itinerary.py` validates requests, produces a demo plan or calls the Google GenAI SDK for structured JSON, validates responses with Pydantic, supports day edits, estimates the budget, and formats exports. `src/storage.py` saves and loads plans through Supabase. Unit tests cover validation, demo, editing, formatting, and mocked persistence.
 
 ## Implementation
 
-The project uses Python, Streamlit, Pydantic, and the Google GenAI Python SDK. The AI prompt requests day-by-day JSON and explicitly prohibits unsupported claims about live prices, hours, distances, or availability. Secrets are read from `GEMINI_API_KEY` and excluded from version control.
+The project uses Python, Streamlit, Pydantic, the Google GenAI Python SDK, and the Supabase Python SDK. The AI prompt requests day-wise attraction and activity suggestions with dining ideas and INR estimates, and prohibits unsupported claims about live prices, hours, distances, or availability. Gemini and Supabase settings are read from local environment configuration or Streamlit Secrets and excluded from version control. Supabase RLS is enabled; only the server secret key can access the table.
 
 ## Testing and results
 
-Verified in Python 3.12.10: `python -m pytest -q` passed all 11 tests; compileall and application logic import checks succeeded. A headless Streamlit process started and its `/_stcore/health` endpoint returned `ok`. Gemini was not tested because no API key was configured. Interactive browser review was not performed.
+Verified in Python 3.12.10: `python -m pytest -q` passed all 15 tests; compileall and application logic import checks succeeded. A headless Streamlit process started and its `/_stcore/health` endpoint returned `ok`. Supabase persistence was tested with a fake client, not a live Supabase project. Gemini was not tested because no API key was configured. Interactive browser review was not performed.
 
 ## Limitations
 
-The app does not use a live travel data provider. Demo content is illustrative. AI output and all budget estimates require independent verification and are not booking quotes.
+The app does not use a live travel data provider. Demo content is illustrative. AI output and all budget estimates require independent verification and are not booking quotes. Saved itineraries use random IDs in place of user accounts; account ownership, access revocation, and multi-user authorization are not implemented.
 
 ## Conclusion
 

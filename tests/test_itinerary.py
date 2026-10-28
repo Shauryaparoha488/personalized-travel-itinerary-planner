@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
+from pydantic import ValidationError
 
 from src.itinerary import (
     Accommodation,
@@ -9,6 +10,7 @@ from src.itinerary import (
     generate_demo_itinerary,
     generate_gemini_itinerary,
     markdown_itinerary,
+    update_day,
     validate_request,
     _make_itinerary,
 )
@@ -62,3 +64,21 @@ def test_incomplete_ai_response_is_rejected():
     req = request(days=1)
     with pytest.raises(ValueError, match="incomplete or invalid"):
         _make_itinerary(req, {"title": "Trip"}, "ai")
+
+
+def test_day_edits_are_validated_and_preserve_other_days():
+    req = request()
+    plan = generate_demo_itinerary(req)
+    updated = update_day(plan, 1, {"title": "A custom day", "local_food": "A vegetarian thali"})
+    assert updated.days[0].title == "A custom day"
+    assert updated.days[0].local_food == "A vegetarian thali"
+    assert updated.days[0].attraction == plan.days[0].attraction
+    assert updated.days[1] == plan.days[1]
+    with pytest.raises(ValueError, match="unsupported"):
+        update_day(plan, 1, {"day": 2})
+
+
+def test_day_edit_rejects_empty_activity_title():
+    plan = generate_demo_itinerary(request())
+    with pytest.raises(ValidationError):
+        update_day(plan, 1, {"morning": {"title": "", "description": "Keep this description valid."}})
