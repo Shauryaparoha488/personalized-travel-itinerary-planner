@@ -1,5 +1,6 @@
 """Streamlit interface for SkillWallet's Personalized Travel Itinerary Planner."""
 
+import os
 from datetime import date, timedelta
 
 import streamlit as st
@@ -90,8 +91,15 @@ if submitted:
     else:
         try:
             with st.spinner("Putting together your travel plan…"):
+                api_key = os.getenv("GEMINI_API_KEY", "")
+                if not api_key:
+                    try:
+                        api_key = str(st.secrets.get("GEMINI_API_KEY", ""))
+                    except Exception:
+                        # Local demo use has no secrets file; the generator will show guidance if needed.
+                        api_key = ""
                 plan = (
-                    generate_gemini_itinerary(request)
+                    generate_gemini_itinerary(request, api_key=api_key or None)
                     if mode.startswith("Gemini")
                     else generate_demo_itinerary(request)
                 )

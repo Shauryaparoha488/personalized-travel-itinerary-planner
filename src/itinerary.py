@@ -139,9 +139,9 @@ def generate_demo_itinerary(request: ItineraryRequest) -> Itinerary:
     return _make_itinerary(request, {"title": f"A {request.days}-day plan for {request.destination}", "summary": "A sample plan to help you start shaping your trip.", "days": days, "budget": budget}, "demo")
 
 
-def generate_gemini_itinerary(request: ItineraryRequest) -> Itinerary:
+def generate_gemini_itinerary(request: ItineraryRequest, api_key: str | None = None) -> Itinerary:
     """Call Google's current GenAI SDK with a structured JSON response schema."""
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    api_key = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
     if not api_key:
         raise ValueError("Gemini mode needs GEMINI_API_KEY. Add it to your local .env file, or choose Demo mode.")
     try:
